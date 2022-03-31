@@ -189,10 +189,10 @@ GSE64758 = files[grepl(pattern = "GSE64758", files)]
 
 # H1 : GSE64758
 GSE64758_plus = BigWig_to_bed(GSE64758[grepl("plus|Plus",GSE64758)])
-GSE64758_plus = filter(GSE64758_plus, between(start,88000000,92000000))
+GSE64758_plus = filter(GSE64758_plus, between(start,87500000,91500000))
 
 GSE64758_minus = BigWig_to_bed(GSE64758[grepl("minus|Minus",GSE64758)])
-GSE64758_minus = filter(GSE64758_minus, between(start,88000000,92000000))
+GSE64758_minus = filter(GSE64758_minus, between(start,87500000,91500000))
 
 H1_GSE64758 = merge_plus_minus_GROseq(plus_strand = GSE64758_plus,
                              minus_strand = GSE64758_minus, 
@@ -306,4 +306,44 @@ rm(plus_strand,minus_strand)
 
 #total = merge_plus_minus_GROseq(plus,minus,"azertyuiop","255,0,0")
 #write.table( total, "./data/interaction/bed_file/bigwig/total.bedGraph", sep="\t", quote = F, row.names = F, col.names = F )
+
+
+
+
+
+############## GROseq_paths
+# W O R K I N G  D I R E C T O R Y
+main.dir = "/shared/projects/chrom_enhancer_bc"
+setwd(main.dir)
+data.dir = file.path(main.dir,"data/interaction/GROseq")
+
+# Retrieving all gros seq bigwig files
+files = list.files(file.path(data.dir), pattern = ".bw|bigWig", full.names = TRUE, recursive = TRUE)
+
+files_K562 = list.files(path = file.path(data.dir,"K562"), pattern = ".bedGraph$", recursive = T, full.names = T)
+filenames_K562 = list.files(path = file.path(data.dir,"K562"), pattern = ".bedGraph$", recursive = T)
+
+#files_K562
+#filenames_K562
+
+
+#files = c(files,files_K562)
+filenames = str_remove(files, paste0(data.dir,"/") )
+filenames_K562 = str_remove(files_K562, paste0(data.dir,"/K562/") )
+
+filenames = str_remove(filenames, pattern = ".bw|.bigWig|.bedGraph")
+filenames = str_replace_all(filenames, pattern= "/", replacement = "_")
+paths = data.frame(files, filenames)
+
+
+filenames_K562 = str_remove(filenames_K562, ".bw|.bigWig|.bedGraph")
+filenames_K562 = str_replace_all(filenames_K562, pattern= "/", replacement = "_")
+
+
+
+write.table(paths, file = "./data/interaction/GROseq/BigWig_paths.txt", quote = FALSE, sep = " ",
+            row.names = FALSE, col.names = FALSE)
+
+write.table(data.frame(files_K562,filenames_K562), file = "./data/interaction/GROseq/bedgraph_paths.txt", quote = FALSE, sep = " ",
+            row.names = FALSE, col.names = FALSE)
 
