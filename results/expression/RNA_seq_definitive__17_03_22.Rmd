@@ -140,10 +140,18 @@ Limma_k562 = lapply(norm_list_limma, function(x) select(data.frame(x), all_of(k5
 ComBat_k562 =  lapply(norm_list_ComBat, function(x) select(data.frame(x), all_of(k562) ))
 
 
+polr3g ="ENSG00000113356"
+polr3g_full_name = rownames(count.matrix)[grepl(pattern = polr3g, rownames(count.matrix))]
+
+
 
 
 ggplot(select(data.frame(log2(count.matrix+1)), K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE,K562), aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             data.frame(log2(count.matrix+1))[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 20, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 17.5, aes(label = ..rr.label..)) +
@@ -160,6 +168,10 @@ ggplot(select(data.frame(log2(count.matrix+1)), K562_HAEMATOPOIETIC_AND_LYMPHOID
 
 ggplot(Limma_k562$TMM, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             Limma_k562$TMM[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -172,6 +184,10 @@ ggplot(Limma_k562$TMM, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) +
 
 ggplot(Limma_k562$TMMwsp, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             Limma_k562$TMMwsp[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -184,6 +200,10 @@ ggplot(Limma_k562$TMMwsp, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)
 
 ggplot(Limma_k562$RLE, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             Limma_k562$RLE[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -196,6 +216,11 @@ ggplot(Limma_k562$RLE, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) +
 
 ggplot(Limma_k562$upperquartile, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             Limma_k562$upperquartile[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
+  
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -208,6 +233,10 @@ ggplot(Limma_k562$upperquartile, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, 
 
 ggplot(Limma_k562$DESeq2, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             Limma_k562$DESeq2[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 20, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 15, aes(label = ..rr.label..)) +
@@ -220,6 +249,10 @@ ggplot(Limma_k562$DESeq2, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)
 
 ggplot(ComBat_k562$TMM, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             ComBat_k562$TMM[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -232,6 +265,10 @@ ggplot(ComBat_k562$TMM, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) 
 
 ggplot(ComBat_k562$TMMwsp, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             ComBat_k562$TMMwsp[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -244,6 +281,10 @@ ggplot(ComBat_k562$TMMwsp, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562
 
 ggplot(ComBat_k562$RLE, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             ComBat_k562$RLE[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -256,6 +297,10 @@ ggplot(ComBat_k562$RLE, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) 
 
 ggplot(ComBat_k562$upperquartile, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
   geom_point() + 
+  geom_point(data = 
+             ComBat_k562$upperquartile[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
@@ -267,7 +312,11 @@ ggplot(ComBat_k562$upperquartile, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE,
 
 
 ggplot(ComBat_k562$DESeq2, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
-  geom_point() + 
+  geom_point() +
+  geom_point(data = 
+             ComBat_k562$DESeq2[polr3g_full_name,], 
+             color = "red",
+             size = 3)+
   geom_smooth(method = "lm") +
   stat_regline_equation(label.y = 20, aes(label = ..eq.label..)) +
   stat_regline_equation(label.y = 18, aes(label = ..rr.label..)) +
@@ -334,7 +383,7 @@ norm_list_melted = lapply(norm_list, function(x) reshape2::melt(x) )
 norm_plot = compute_plot(norm_list_melted)
 print(norm_plot$DESeq2)
 
-raw_log
+
 for (plot in norm_plot){
   print(plot)
 }
@@ -380,12 +429,15 @@ expression_plot(batch_raw_melt) + ggtitle("Expression boxplot : Raw expression (
 raw_matrix = data.frame(log2(count.matrix+1))
 
 
-IQRs = data.frame("IQR" = apply(raw_matrix, 1, IQR))
-IQRs$IQR = as.numeric(IQRs$IQR)
-pca_subset = raw_matrix[rownames(filter(IQRs, IQRs$IQR>7)) , ]
+extract_top_varying_genes = function(matrix, threshold=0.85){
+  IQRs = data.frame("IQR" = apply(matrix, 1, IQR))
+  IQRs$IQR = as.numeric(IQRs$IQR)
+  return( rownames(filter(IQRs, IQRs$IQR> quantile(IQRs$IQR,threshold)))  )
+}
 
 
-hist(IQRs$IQR)
+pca_subset = raw_matrix[extract_top_varying_genes(raw_matrix) , ]
+
 
 ```
 
@@ -412,7 +464,8 @@ fviz_pca_ind(res.pca,
 
 ```{r PCANorm, fig.width=15, fig.height=15}
 
-norm_pca = data.frame(t(norm_list$DESeq2[rownames(filter(IQRs, IQRs$IQR>7)) , ]))
+norm_pca = data.frame(t(norm_list$DESeq2))
+norm_pca = norm_pca[,extract_top_varying_genes(norm_list$DESeq2)]
 
 
 res.pca = PCA(norm_pca,  graph = F)
@@ -431,15 +484,15 @@ fviz_pca_ind(res.pca,
 ## Normalisation + Batch correction (ComBat_seq)
 ```{r PCANorm2, fig.width=15, fig.height=15}
 
-norm_pca_combat = data.frame(t(norm_list_ComBat$DESeq2[rownames(filter(IQRs, IQRs$IQR>7)) , ]))
-
+norm_pca_combat = data.frame(t(norm_list_ComBat$DESeq2))
+norm_pca_combat = norm_pca_combat[,extract_top_varying_genes(norm_list_ComBat$DESeq2,0.85)]
 
 res.pca = PCA(norm_pca_combat,  graph = F)
 fviz_pca_ind(res.pca, 
              col.ind = design_PCA,
              repel = TRUE,
              palette = "Set1",
-             ggrepel.max.overlaps = 1) + labs(title ="PCA normalisad count (DESeq2)",)
+             ggrepel.max.overlaps = 1) + labs(title ="PCA normalisad count (DESeq2) + ComBat_seq",)
 
 
 
@@ -451,15 +504,17 @@ fviz_pca_ind(res.pca,
 ## Normalisation + Batch correction (limma)
 ```{r PCANorm3, fig.width=15, fig.height=15}
 
-norm_pca_limma = data.frame(t(norm_list_limma$DESeq2[rownames(filter(IQRs, IQRs$IQR>7)) , ]))
+#norm_pca_limma = data.frame(t(norm_list_limma$DESeq2[rownames(filter(IQRs, IQRs$IQR>7)) , ]))
 
+norm_pca_limma = data.frame(t(norm_list_limma$DESeq2))
+norm_pca_limma = norm_pca_limma[, extract_top_varying_genes(norm_list_limma$DESeq2,0.85) ]
 
 res.pca = PCA(norm_pca_limma,  graph = F)
 fviz_pca_ind(res.pca, 
              col.ind = design_PCA,
              repel = TRUE,
              palette = "Set1",
-             ggrepel.max.overlaps = 1) + labs(title ="PCA normalisad count (DESeq2)",)
+             ggrepel.max.overlaps = 1) + labs(title ="PCA normalisad count (DESeq2) + limma ",)
 
 
 
@@ -609,5 +664,55 @@ map = pheatmap(select(limma_heatmap,-colors),
 map$gtable$grobs[[4]]$gp=gpar(col= limma_heatmap$colors, fontsize = 5)
 print(map) 
 
+
+```
+
+
+```{r ggpairs, fig.width=15, fig.height=10}
+library(GGally)
+
+ComBat_norm = data.frame(norm_list_ComBat$DESeq2)
+
+tmp = filter(ComBat_norm, grepl(paste(of_interest$ENS_id,collapse="|"),substr(row.names(ComBat_norm),1,15) ))
+tmp$ENS_id = substr(rownames(tmp),1,15)
+tmp = merge(tmp, of_interest, by = "ENS_id")
+row.names(tmp) = tmp$gene_name
+to_be_plotted = select(tmp, -gene_name, -ENS_id)
+
+
+design = c(rep("CCLE", 20 ), rep("RoadMap",length(cell_lines)-20))
+#to_be_plotted = rbind(to_be_plotted, "condition" = design)
+
+#to_be_plotted
+
+ggpairs(as.data.frame(t(to_be_plotted)),
+        #aes(colors=design)
+        mapping = ggplot2::aes(color =design))+
+  theme_minimal()
+
+```
+
+
+```{r ggpairs2, fig.width=15, fig.height=10}
+
+
+limma_norm = data.frame(norm_list_limma$DESeq2)
+
+tmp = filter(limma_norm, grepl(paste(of_interest$ENS_id,collapse="|"),substr(row.names(limma_norm),1,15) ))
+tmp$ENS_id = substr(rownames(tmp),1,15)
+tmp = merge(tmp, of_interest, by = "ENS_id")
+row.names(tmp) = tmp$gene_name
+to_be_plotted = select(tmp, -gene_name, -ENS_id)
+
+
+design = c(rep("CCLE", 20 ), rep("RoadMap",length(cell_lines)-20))
+#to_be_plotted = rbind(to_be_plotted, "condition" = design)
+
+#to_be_plotted
+
+ggpairs(as.data.frame(t(to_be_plotted)),
+        #aes(colors=design)
+        mapping = ggplot2::aes(color =design))+
+  theme_minimal()
 
 ```
