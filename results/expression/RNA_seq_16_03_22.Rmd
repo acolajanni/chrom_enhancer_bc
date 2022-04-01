@@ -1,0 +1,640 @@
+---
+title: "RNA_seq_16_03_22"
+author: "Antonin COLAJANNI"
+date: "16/03/2022"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r import, echo=T, results='hide', message=F, warning=F}
+# W O R K I N G  D I R E C T O R Y
+main.dir = "/shared/projects/chrom_enhancer_bc"
+setwd(main.dir)
+
+data.dir = file.path(main.dir,"data/expression/rdata")
+
+
+# I M P O R T
+library(pheatmap  )
+library(ggpubr)
+library(sva)
+library(edgeR)
+library(DESeq2)
+library(DT)
+library(stringr)
+library(dplyr)
+library(reshape2)
+library(FactoMineR)
+library(factoextra)
+library(grid)
+source("./scripts/Normalization.R")
+load(file.path(data.dir,"cancer_healthy_expression.RData"))
+
+
+
+# change format
+cell_lines = names(expr)[! names(expr) %in% c("gene_name","ENSEMBL_id")]
+expr = select(expr, -gene_name)
+# as numeric
+expr <- cbind("ENSEMBL_id"=expr$ENSEMBL_id, 
+              mutate_all(select(expr,all_of(cell_lines)), function(x) as.numeric(as.character(x))))
+
+# Remove lowly expressed genes + 1 duplicated id
+expr <- expr %>%
+  filter(! duplicated(ENSEMBL_id))
+
+row.names(expr) = expr$ENSEMBL_id
+expr$ENSEMBL_id = NULL
+
+Row_sums = rowSums(expr)
+filtered_expr = expr[Row_sums > 3*ncol(expr),]
+```
+
+```{r print_table}
+
+DT::datatable(head(filtered_expr))
+```
+
+
+```{r batch_limma}
+# Parameters
+design = c(rep("CCLE", 20 ), rep("RoadMap",length(cell_lines)-20))
+count.matrix = data.matrix(filtered_expr)
+
+
+
+All_normalisations = function(count.matrix,design){
+  norm_list = list()
+  tools=c("TMM", "TMMwsp", "RLE", "upperquartile")
+  # edgeR
+  for (tool in tools){
+    message(tool)
+    edgeR.dgelist = DGEList(counts = count.matrix, group = factor(design))
+    nf = calcNormFactors(edgeR.dgelist, method=tool)
+    edgeR_norm <- cpm(nf, normalized.lib.sizes=TRUE, log = TRUE)
+    norm_list[[tool]] = edgeR_norm  
+  }
+  #DESeq2
+  message("DESeq2")
+  deseq_norm = tools.norm.RNAseq(count.matrix, tool = "vst2", design = design )
+  norm_list[["DESeq2"]] = deseq_norm
+  return(norm_list)
+}
+
+
+norm_list_limma = All_normalisations(count.matrix,design)
+
+
+## Applying limma batch correction
+norm_list_limma = lapply(norm_list_limma, function(x) removeBatchEffect(x, design) )
+norm_list_limma_melted = lapply(norm_list_limma, function(x) reshape2::melt(x) )
+
+
+```
+
+
+```{r batch_combat}
+# ComBat batch corrections : needs raw counts
+load(file.path(data.dir,"ComBat_seq_correction.RData"))
+
+norm_list_ComBat = All_normalisations(adjusted,design)
+norm_list_ComBat_melted = lapply(norm_list_ComBat, function(x) reshape2::melt(x) )
+
+
+
+```
+
+### Scatterplot Limma batch correction vs ComBat_seq
+
+```{r scatter0}
+
+k562 = colnames(norm_list_limma[['TMM']])[grepl("K562",colnames(norm_list_limma[['TMM']]))] 
+
+
+Limma_k562 = lapply(norm_list_limma, function(x) select(data.frame(x), all_of(k562) ))
+ComBat_k562 =  lapply(norm_list_ComBat, function(x) select(data.frame(x), all_of(k562) ))
+
+
+
+ggplot(select(data.frame(log2(count.matrix+1)), K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE,K562), aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 20, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 17.5, aes(label = ..rr.label..)) +
+  ggtitle("Raw counts (log2+1)")
+
+
+```
+
+```{r scatter1}
+
+
+
+ggplot(Limma_k562$TMM, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("TMM normalisation - Limma batch correction")
+
+```
+
+```{r scatter2}
+
+
+ggplot(Limma_k562$TMMwsp, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("TMMwsp normalisation - Limma batch correction")
+
+```
+
+```{r scatter3}
+
+
+ggplot(Limma_k562$RLE, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("RLE normalisation - Limma batch correction")
+
+```
+
+```{r scatter4}
+
+
+ggplot(Limma_k562$upperquartile, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("Upperquartile normalisation - Limma batch correction")
+
+```
+
+```{r scatter5}
+
+
+ggplot(Limma_k562$DESeq2, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 20, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 15, aes(label = ..rr.label..)) +
+  ggtitle("vst normalisation (DESeq2) - Limma batch correction")
+
+```
+
+
+```{r scatter12}
+
+ggplot(ComBat_k562$TMM, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("TMM normalisation - Combat_seq correction")
+
+```
+
+```{r scatter22}
+
+
+ggplot(ComBat_k562$TMMwsp, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("TMMwsp normalisation - Combat_seq correction ")
+
+```
+
+```{r scatter32}
+
+
+ggplot(ComBat_k562$RLE, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("RLE normalisation - Combat_seq correction")
+
+```
+
+```{r scatter42}
+
+
+ggplot(ComBat_k562$upperquartile, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 15, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 10, aes(label = ..rr.label..)) +
+  ggtitle("Upperquartile normalisation - Combat_seq correction")
+
+```
+
+```{r scatter52}
+
+
+ggplot(ComBat_k562$DESeq2, aes(x=K562_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE, y=K562)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  stat_regline_equation(label.y = 20, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = 18, aes(label = ..rr.label..)) +
+  ggtitle("vst normalisation (DESeq2) - Combat_seq correction")
+```
+
+### vst + ComBat semble être le meilleur compromis :
+R2 le plus grand + x +/- = 1
+
+
+# Vérification avec PCA
+## ComBat_seq
+```{r PCA1, fig.width=15, fig.height=15}
+
+of_interest = c("MDAMB231","MDAMB436","HCC1937", "HCC1806",
+                "HCC1954","MDAMB468")
+
+design_PCA = ifelse(grepl("K562", cell_lines), yes = "K562", no = design)
+design_PCA = ifelse(grepl(paste(of_interest,collapse = "|"), cell_lines), yes = "TNBC", no = design_PCA)
+
+res.pca = PCA(select(for_pca, -interest), graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA Combatseq + DESeq2",)
+
+
+
+```
+
+```{r PCA2, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_ComBat$TMM)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA Combatseq + TMM",)
+
+
+
+```
+
+```{r PCA3, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_ComBat$TMMwsp)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA Combatseq + TMMwsp",)
+
+
+```
+
+```{r PCA4, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_ComBat$RLE)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA Combatseq + RLE",)
+
+```
+```{r PCA5, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_ComBat$upperquartile)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA Combatseq + Upperquartile",)
+
+
+```
+
+## Limma
+```{r PCA21, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_limma$DESeq2)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA limma + DESeq2",)
+
+
+
+
+
+```
+```{r PCA22, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_limma$TMM)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA limma + TMM",)
+
+
+
+
+
+```
+```{r PCA23, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_limma$TMMwsp)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA limma + TMMwsp",)
+
+
+```
+
+```{r PCA24, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_limma$RLE)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA limma + RLE",)
+
+```
+```{r PCA25, fig.width=15, fig.height=15}
+
+
+
+res.pca = PCA(data.frame(t(norm_list_limma$upperquartile)),  graph = F)
+fviz_pca_ind(res.pca, 
+             col.ind = design_PCA,
+             repel = TRUE,
+             palette = "Set1",
+             ggrepel.max.overlaps = 1) + labs(title ="PCA limma + Upperquartile",)
+
+
+```
+
+
+
+
+
+
+# Expression boxplot
+
+```{r expression_plot1, fig.width=15, fig.height=10}
+
+ctcfl = "ENSG00000124092"
+ctcf =  "ENSG00000102974"
+pou5f1 ="ENSG00000204531"
+myc =   "ENSG00000136997"
+polr3gl="ENSG00000121851"
+polr3g ="ENSG00000113356"
+
+CCLE = cell_lines[1:20]
+ROADMAP = cell_lines[21:length(names(expr))]
+#melted_expr = reshape2::melt(edgeR_norm)
+
+condition = ifelse(norm_list_ComBat_melted$TMM$Var2 %in% CCLE, yes = "CCLE", no = "RoadMap")
+
+# cancer lines of interest : 
+of_interest = c("MDAMB231","MDAMB436","HCC1937", "HCC1806",
+                "HCC1954","MDAMB468","K562")
+color_cell = ifelse(grepl(paste(of_interest,collapse = "|"),  cell_lines ), yes = "red", no ="black")
+
+expression_plot = function(melted_df){
+plot = ggplot(data = melted_df, aes(x=Var2, y=value, color = condition)) + 
+  geom_boxplot()   +
+  geom_text(aes(x=Var2,
+                label=ifelse(grepl(polr3g,Var1),".",''))
+            , size= 10, color = "black") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, colour = color_cell),
+          axis.text=element_text(size=6))  +
+  xlab("cell_lines") + ylab("normalized_expression")
+  return(plot)
+}
+
+
+combat_plot = expression_plot(norm_list_ComBat_melted$DESeq2) + ggtitle("Expression boxplot : ComBat_seq")
+combat_plot
+
+
+```
+
+```{r expression_plot2, fig.width=15, fig.height=10}
+
+limma_plot = expression_plot(norm_list_limma_melted$DESeq2) + ggtitle("Expression boxplot : limma batch correction")
+limma_plot
+
+
+```
+
+
+
+# Expression heatmap : DESeq2 + ComBat_seq
+
+```{r heatmap, fig.width=15, fig.height=10}
+
+ComBat_norm = norm_list_ComBat_melted$DESeq2
+
+of_interest = c(
+  "CTCFL" = "ENSG00000124092",
+  "CTCF" =  "ENSG00000102974",
+  "POU5F1" ="ENSG00000204531",
+  "MYC" =   "ENSG00000136997",
+  "POLR3GL"="ENSG00000121851",
+  "POLR3G" ="ENSG00000113356" )
+of_interest = data_frame("ENS_id" = of_interest, "gene_name" = names(of_interest))
+
+tmp = filter(ComBat_norm, grepl(paste(of_interest$ENS_id,collapse="|"),ComBat_norm$Var1))
+tmp$copie = substr(tmp$Var1,1,15)
+
+
+
+to_heatmap = select(merge(tmp,of_interest, by.x = "copie", by.y = "ENS_id"),
+                    gene_name,Var2 ,value)
+colnames(to_heatmap) = c("gene_name","cell_line","expression")
+
+heat = reshape2::dcast(to_heatmap, gene_name~cell_line)
+row.names(heat) = heat$gene_name
+heat$gene_name = NULL
+
+
+# Centering by the median
+MedianCentering <- function(x){
+  (x - median(x))
+}
+heat_norm = t(apply(heat, 1, MedianCentering))
+
+
+
+annotation_heatmap = data.frame("data_source" = design, row.names = cell_lines)
+
+color = c("red","blue")
+names(color) = c("CCLE","RoadMap")
+
+
+
+TNBC = c("MDAMB231","MDAMB436","HCC1937", "HCC1806",
+         "HCC1954","MDAMB468")
+
+annotation_heatmap$state = ifelse(
+  grepl(paste(TNBC,collapse="|") ,row.names(annotation_heatmap)), 
+  yes = "TNBC", no = "other")
+
+colors = list(data_source = color)
+
+map = pheatmap(t(heat),
+         #color = brewer.pal(20, name = "RdBu"),
+         cutree_rows = 2,
+         angle_col = 315,
+         fontsize_row = 5)
+
+
+tmp = data.frame(t(heat))
+
+tmp$colors = ifelse(grepl(paste(TNBC,collapse="|") ,row.names(annotation_heatmap)), 
+                                                  yes = "red", no = "darkgrey")
+
+col = tmp[order(match(colnames(heat), map$gtable$grobs[[5]]$label)),]$colors
+
+
+map$gtable$grobs[[5]]$gp=gpar(col= col, fontsize = 5)
+map
+
+
+```
+
+```{r heatmap_norm, fig.width=15, fig.height=10}
+
+map = pheatmap(t(heat_norm),
+         #color = brewer.pal(20, name = "RdBu"),
+         cutree_rows = 2,
+         angle_col = 315,
+         fontsize_row = 5)
+
+
+tmp = data.frame(t(heat))
+
+tmp$colors = ifelse(grepl(paste(TNBC,collapse="|") ,row.names(annotation_heatmap)), 
+                                                  yes = "red", no = "darkgrey")
+
+col = tmp[order(match(colnames(heat), map$gtable$grobs[[5]]$label)),]$colors
+
+
+map$gtable$grobs[[5]]$gp=gpar(col= col, fontsize = 5)
+map
+
+
+```
+
+
+# Expression heatmap : DESeq2 + limma
+
+```{r heatmap2, fig.width=15, fig.height=10}
+
+limma_norm = norm_list_limma_melted$DESeq2
+
+
+tmp = filter(limma_norm, grepl(paste(of_interest$ENS_id,collapse="|"),ComBat_norm$Var1))
+tmp$copie = substr(tmp$Var1,1,15)
+
+
+
+to_heatmap = select(merge(tmp,of_interest, by.x = "copie", by.y = "ENS_id"),
+                    gene_name,Var2 ,value)
+colnames(to_heatmap) = c("gene_name","cell_line","expression")
+
+heat = reshape2::dcast(to_heatmap, gene_name~cell_line)
+row.names(heat) = heat$gene_name
+heat$gene_name = NULL
+
+heat_norm = t(apply(heat, 1, MedianCentering))
+
+annotation_heatmap = data.frame("data_source" = design, row.names = cell_lines)
+
+color = c("red","blue")
+names(color) = c("CCLE","RoadMap")
+
+
+
+TNBC = c("MDAMB231","MDAMB436","HCC1937", "HCC1806",
+         "HCC1954","MDAMB468")
+
+annotation_heatmap$state = ifelse(
+  grepl(paste(TNBC,collapse="|") ,row.names(annotation_heatmap)), 
+  yes = "TNBC", no = "other")
+
+colors = list(data_source = color)
+
+map = pheatmap(t(heat),
+         cutree_rows = 2,
+         angle_col = 315,
+         fontsize_row = 5)
+
+
+tmp = data.frame(t(heat))
+
+
+tmp$colors = ifelse(grepl(paste(TNBC,collapse="|") ,row.names(annotation_heatmap)), 
+                                                  yes = "red", no = "darkgrey")
+
+col = tmp[order(match(colnames(heat), map$gtable$grobs[[5]]$label)),]$colors
+
+map$gtable$grobs[[5]]$gp=gpar(col= col, fontsize = 5)
+map
+
+
+```
+
+```{r heatmap_norm2, fig.width=15, fig.height=10}
+
+map = pheatmap(t(heat_norm),
+         #color = brewer.pal(20, name = "RdBu"),
+         cutree_rows = 2,
+         angle_col = 315,
+         fontsize_row = 5)
+
+
+tmp = data.frame(t(heat))
+
+tmp$colors = ifelse(grepl(paste(TNBC,collapse="|") ,row.names(annotation_heatmap)), 
+                                                  yes = "red", no = "darkgrey")
+
+col = tmp[order(match(colnames(heat), map$gtable$grobs[[5]]$label)),]$colors
+
+
+map$gtable$grobs[[5]]$gp=gpar(col= col, fontsize = 5)
+map
+
+
+```

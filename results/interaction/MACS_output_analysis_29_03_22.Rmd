@@ -1,0 +1,164 @@
+---
+title: "MACS_output_analysis"
+author: "Antonin COLAJANNI"
+date: "29/03/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Comparison of the peak calling results of MACS2 region 
+## REGION : chr5:84,000,000-chr5:94,000,000 
+##### 4 conditions :
+- peak calling on whole chr5 (default pvalue cutoff)
+- peak calling on chr5:84,000,000-chr5:94,000,000 (default pvalue cutoff)
+- peak calling on whole chr5 (pvalue cutoff = 0.01)
+- peak calling on chr5:84,000,000-chr5:94,000,000 (pvalue cutoff = 0.01)
+
+```{r import, echo=T, results='hide', message=F, warning=F}
+
+# W O R K I N G  D I R E C T O R Y
+main.dir = "/shared/projects/chrom_enhancer_bc"
+setwd(main.dir)
+
+
+# I M P O R T
+source(file.path(main.dir,"scripts/fun_interactions.r"))
+data.dir = "/shared/projects/chrom_enhancer_bc/data/interaction/bedgraph_analysis"
+
+
+```
+
+```{r import data}
+import_MACS2_output = function(filenames, directory){
+  bed_list = list()
+  columns = c("chrom","start","end","name","score","strand","signalValue","pvalue","qvalue","peak")
+  for (file in filenames){
+  
+    file_path = paste0(directory,"/",file)
+  
+    tmp = readLines(file_path, n=2)
+    if (length(tmp) == 1){ tmp = read.table(text = "", col.names = columns) }
+    else {tmp = read.table(file_path,skip = 1, col.names = columns)}
+    
+      bed_list[[file]] = tmp
+  }
+  return(bed_list)
+}
+
+default_chr5.dir = file.path (data.dir,"chr5_default")
+default_10mb.dir = file.path (data.dir,"10mb_default")
+cutoff_chr5.dir = file.path (data.dir,"chr5_cutoff")
+cutoff_10mb.dir = file.path (data.dir,"10mb_cutoff")
+whole_genome= file.path (data.dir,"whole_genome")
+whole_genome_cutoff= file.path (data.dir,"whole_genome_cutoff")
+
+default_chr5_files = import_MACS2_output(list.files(default_chr5.dir),default_chr5.dir)
+default_10mb_files = import_MACS2_output(list.files(default_10mb.dir),default_10mb.dir)
+cutoff_chr5_files = import_MACS2_output(list.files(cutoff_chr5.dir),cutoff_chr5.dir)
+cutoff_10mb_files = import_MACS2_output(list.files(cutoff_10mb.dir, pattern = ".bedGraph"),cutoff_10mb.dir)
+
+genome_files = import_MACS2_output(list.files(whole_genome),whole_genome)
+cutoff_genome_files = import_MACS2_output(list.files(whole_genome_cutoff),whole_genome_cutoff)
+
+
+```
+
+## Compting peak number per sample, in the 10mb range around POLR3G
+
+```{r fig1, fig.width=12, fig.height=8, warning=F}
+plot_geom_bar = function(counter_row, title = "barplot"){
+  
+  colnames(counter_row) = c("samples","value")
+  GSE = unique(str_sub(counter_row$samples, 1, 9))
+  color_GSE = brewer.pal(n = length(GSE), name = 'Dark2')
+  
+  GSE = data.frame("GSE_id" = GSE, "color" = color_GSE)
+  
+  counter_row$GSE_id = str_sub(counter_row$samples, 1, 9)
+  counter_row = merge(counter_row, GSE, by="GSE_id")
+  
+  colors = arrange(counter_row, value)$color
+  
+  p = ggplot(data = counter_row, aes(x = value, y= reorder(samples,value), fill=value)) +
+  geom_bar(stat="identity") +
+  geom_text(data = subset(counter_row, value != 0), 
+            color="black",hjust=-0.2, size=3.8, angle=0,
+            aes(y = ,label = value))+
+  coord_cartesian(xlim = c(0, max(counter_row$value)+0.1*max(counter_row$value))) + 
+  labs(title = title, x = "peak number chr5:84,000,000-chr5:94,000,000",
+       y = "samples") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(colour = colors)) 
+  return(p)
+}
+
+
+default_chr5_files_filtered = lapply(default_chr5_files, function(x) filter(x, between(start, 84000000,94000000)))
+peak_number_1 = ldply(lapply(default_chr5_files_filtered, function(x) x = nrow(x)))
+
+
+p = plot_geom_bar(peak_number_1, "Peak number for MACS2 output \n whole chr5, default parameter (pvalue_cutoff = 1e-5)")
+p
+
+
+
+```
+
+```{r fig2, fig.width=12, fig.height=8, warning=F}
+
+default_10mb_files_filtered = lapply(default_10mb_files, function(x) filter(x, between(start, 84000000,94000000)))
+peak_number_2 = ldply(lapply(default_10mb_files_filtered, function(x) x = nrow(x)))
+
+p2 = plot_geom_bar(peak_number_2, "Peak number for MACS2 output \n 10mb range (chr5:84Mb-94Mb), \n default parameter (pvalue_cutoff = 1e-5)")
+p2
+
+```
+
+```{r fig3, fig.width=12, fig.height=8,warning=F}
+
+cutoff_chr5_files_filtered = lapply(cutoff_chr5_files, function(x) filter(x, between(start, 84000000,94000000)))
+peak_number_3 = ldply(lapply(cutoff_chr5_files_filtered, function(x) x = nrow(x)))
+
+p3 = plot_geom_bar(peak_number_3, "Peak number for MACS2 output \n whole chr5 (pvalue_cutoff = 1e-2)")
+p3
+
+```
+
+```{r fig4, fig.width=12, fig.height=8,warning=F}
+
+cutoff_10mb_files_filtered = lapply(cutoff_10mb_files, function(x) filter(x, between(start, 84000000,94000000)))
+peak_number_4 = ldply(lapply(cutoff_10mb_files_filtered, function(x) x = nrow(x)))
+
+p4 = plot_geom_bar(peak_number_4, "Peak number for MACS2 output \n 10mb range (chr5:84Mb-94Mb) (pvalue_cutoff = 1e-2)")
+p4
+
+```
+
+## Whole genome, pvalue cutoff comparison
+
+```{r fig5, fig.width=12, fig.height=8,warning=F}
+
+cutoff_genome_files_filtered = lapply(cutoff_genome_files, function(x) filter(x, between(start, 84000000,94000000)))
+cutoff_genome_files_filtered = lapply(cutoff_genome_files_filtered, function(x) filter(x, chrom %in% c("chr5","5")))
+
+peak_number_5 = ldply(lapply(cutoff_genome_files_filtered, function(x) x = nrow(x)))
+
+p4 = plot_geom_bar(peak_number_5, "Peak number for MACS2 output \n Whole genome analysis (chr5:84Mb-94Mb) (pvalue_cutoff = 1e-2)")
+p4
+
+```
+
+```{r fig6, fig.width=12, fig.height=8,warning=F}
+
+genome_files_filtered = lapply(genome_files, function(x) filter(x, between(start, 84000000,94000000)))
+genome_files_filtered = lapply(genome_files_filtered, function(x) filter(x, chrom %in% c("chr5","5")))
+
+peak_number_6 = ldply(lapply(genome_files_filtered, function(x) x = nrow(x)))
+
+p5 = plot_geom_bar(peak_number_6, "Peak number for MACS2 output \n Whole genome analysis (chr5:84Mb-94Mb) (pvalue_cutoff = 1e-5)")
+p5
+
+```

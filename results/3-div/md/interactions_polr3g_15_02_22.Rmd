@@ -1,0 +1,301 @@
+---
+title: "interactions_polr_3g_15_02_22"
+author: "Antonin_Colajanni"
+date: "15/02/2022"
+output: html_document
+---
+
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+# W O R K I N G  D I R E C T O R Y
+main.dir = "/shared/projects/chrom_enhancer_bc"
+setwd(main.dir)
+
+data.dir = file.path(main.dir,"data/interaction/rdata/")
+
+
+# I M P O R T
+source("./scripts/fun_interactions.r")
+load(file.path(data.dir,"/BENGI_benchmark_pchic.RData"))
+load(file.path(data.dir,"/3div_0.05.Rdata"))
+load(file.path(data.dir,"/raw_BENGI_interactions_POLR3G.RData"))
+library(UpSetR)
+
+data = File_list_filtered0.05
+rm(File_list_filtered0.05)
+data_05 = lapply(data, hic_format )
+data_01 = lapply(data_05, function(x) filter_pvalue(df=x, seuil = 2))
+
+
+polr3g_exact = GRanges(
+  seqnames = Rle("chr5"),
+  IRanges(89768410, 89777404))
+```
+
+```{r preupset05}
+# interactions lists 
+interactions_05 = lapply(data_05, function(x) subset_by_overlap(ROI = polr3g_exact, df = x))
+interaction_polr3g_05 = lapply(interactions_05, function(x) x$interaction_polr3g)
+# as dataframe
+interactions_df_05 = ldply(interactions_05)
+# listing of Cell_lines
+cell_lines = unique(interactions_df_05$.id)
+```
+
+## Upset plot p<0.05
+
+```{r upset, fig.width=8, fig.height=5}
+upset(fromList(interaction_polr3g_05),
+      sets = cell_lines, sets.bar.color = "#56B4E9",
+      order.by = "freq", mb.ratio = c(0.4,0.6),
+      empty.intersections = NULL, set_size.show = TRUE,
+      set_size.scale_max = 50)
+```
+
+
+```{r preupset01}
+# interactions lists 
+interactions_01 = lapply(data_01, function(x) subset_by_overlap(ROI = polr3g_exact, df = x))
+interaction_polr3g_01 = lapply(interactions_01, function(x) x$interaction_polr3g)
+# as dataframe
+interactions_df_01 = ldply(interactions_01)
+# listing of Cell_lines
+cell_lines = unique(interactions_df_01$.id)
+```
+
+
+## Upset plot p<0.01
+```{r upset012, fig.width=8, fig.height=5}
+upset(fromList(interaction_polr3g_01),
+      sets = cell_lines, sets.bar.color = "#56B4E9",
+      order.by = c("degree"), mb.ratio = c(0.4,0.6),
+      empty.intersections = NULL, set_size.show = TRUE,
+      set_size.scale_max = 20)
+```
+
+# Stacked Barplot 
+
+## p<0.05
+```{r stack15, fig.width=8, fig.height=5}
+# All the interactions that are shared 
+freq_05 = data.frame(table(interactions_df_05$interaction_polr3g))
+unique = as.vector(freq_05[freq_05$Freq == 1,]$Var1)
+not_unique = as.vector(freq_05[freq_05$Freq >= 2,]$Var1)
+
+# counting interactions
+find_unique <- function(df, unique){
+  tmp = ifelse(df$interaction_polr3g %in% unique, yes = TRUE, no = FALSE)
+  return(data.frame("interactions" = c(sum(tmp==TRUE), sum(tmp==FALSE)),
+                    "condition" = c("unique", "common"))) }
+
+interactions_unique = lapply(interactions_05, 
+                             function(x) find_unique(x, unique))
+
+interactions_unique = ldply(interactions_unique)
+
+```
+
+```{r stack152, fig.width=10, fig.height=8}
+p <- ggplot(data = interactions_unique, aes(x = reorder(.id,interactions), y = interactions)) +
+  geom_col(aes(fill = condition), width = 0.7)+
+  geom_text(data=subset(interactions_unique, interactions!=0),
+    position = position_stack(vjust = 0.5),
+    size = 4,
+    aes(y = , label = interactions, group =condition), color = "white")+
+    scale_fill_manual(values = c("#00539CFF", "orangered"))+
+    theme_classic() + coord_flip() +  
+    xlab("Cell line") + ylab("Contact number") + 
+    ggtitle("Number of statistically significant interactions with POLR3G (p<0.05)") 
+p
+```
+
+## Pie chart
+```{r pie_chart_prep, fig.width=4, fig.height=4}
+pie_df = data.frame("value" = c(length(unique), length(not_unique)),
+                    "condition" = c("unique","common"))
+```
+
+```{r piechart, fig.width=5, fig.height=4}
+ggplot(pie_df, aes(x="", y=value, fill=condition)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  scale_fill_manual(values = c("#00539CFF", "orangered")) + 
+  geom_text(
+    position = position_stack(vjust = 0.5), 
+    size = 5, 
+    aes(y = ,label = value, group =condition), color = "white")+
+    ggtitle("Number of statistically significant interactions \n with POLR3G (p<0.05)") 
+
+```
+
+
+# p<0.01
+
+```{r stack153, fig.width=8, fig.height=5}
+# All the interactions that are shared 
+freq_01 = data.frame(table(interactions_df_01$interaction_polr3g))
+unique = as.vector(freq_01[freq_01$Freq == 1,]$Var1)
+not_unique = as.vector(freq_01[freq_01$Freq >= 2,]$Var1)
+
+# counting interactions
+find_unique <- function(df, unique){
+  tmp = ifelse(df$interaction_polr3g %in% unique, yes = TRUE, no = FALSE)
+  return(data.frame("interactions" = c(sum(tmp==TRUE), sum(tmp==FALSE)),
+                    "condition" = c("unique", "common"))) }
+
+interactions_unique = lapply(interactions_01, 
+                             function(x) find_unique(x, unique))
+
+interactions_unique = ldply(interactions_unique)
+
+```
+
+```{r stack154, fig.width=10, fig.height=8}
+p <- ggplot(data = interactions_unique, aes(x = reorder(.id,interactions), y = interactions)) +
+  geom_col(aes(fill = condition), width = 0.7)+
+  geom_text( data=subset(interactions_unique, interactions!=0),
+    position = position_stack(vjust = 0.5), 
+    size = 4, 
+    aes(y = ,label = interactions, group= condition), color = "white")+
+
+  
+    scale_fill_manual(values = c("#00539CFF", "orangered"))+
+    theme_classic() + coord_flip() +  
+    xlab("Cell line") + ylab("Contact number") + 
+    ggtitle("Number of statistically significant interactions with POLR3G (p<0.01)") 
+p
+
+
+
+```
+
+## Pie chart
+```{r pie_chart_prep2, fig.width=4, fig.height=4}
+pie_df = data.frame("value" = c(length(unique), length(not_unique)),
+                    "condition" = c("unique","common"))
+```
+
+```{r piechart2, fig.width=5, fig.height=4}
+ggplot(pie_df, aes(x="", y=value, fill=condition)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  scale_fill_manual(values = c("#00539CFF", "orangered")) + 
+  geom_text(
+    position = position_stack(vjust = 0.5), 
+    size = 5, 
+    aes(y = ,label = value, group =condition), color = "white")+
+    ggtitle("Number of statistically significant interactions \n with POLR3G (p<0.01)") 
+
+```
+
+## BENGI dataset
+
+```{r import_bengi_upset, fig.width=8, fig.height=5}
+raw_bengi_polr3g_df = ldply(raw_bengi_polr3g)
+interactions = lapply(raw_bengi_polr3g, function(x) x$polr3g_interaction)
+
+upset(fromList(interactions),
+      sets.bar.color = "#56B4E9",
+      order.by = "freq", #mb.ratio = c(0.4,0.6),
+      empty.intersections = NULL, set_size.show = TRUE,
+      set_size.scale_max = 30)
+```
+
+
+
+
+```{r plot_unique_bengi, fig.width=8, fig.height=5}
+# Unique vs common
+freq = data.frame(table(raw_bengi_polr3g_df$polr3g_interaction))
+unique = as.vector(freq[freq$Freq == 1,]$Var1)
+not_unique = as.vector(freq[freq$Freq >= 2,]$Var1)
+
+
+# counting interactions
+find_unique <- function(df, unique){
+  tmp = ifelse(df$polr3g_interaction %in% unique, yes = TRUE, no = FALSE)
+  return(data.frame("interactions" = c(sum(tmp==TRUE), sum(tmp==FALSE)),
+                    "condition" = c("unique", "common"))) }
+
+interactions_unique = lapply(raw_bengi_polr3g, 
+                             function(x) find_unique(x, unique))
+
+interactions_unique = ldply(interactions_unique)
+
+p <- ggplot(data = interactions_unique, aes(x = reorder(.id,interactions), y = interactions)) +
+  geom_col(aes(fill = condition), width = 0.7)+
+  geom_text(data=subset(interactions_unique, interactions!=0),
+            position = position_stack(vjust = 0.5),
+            size = 4,
+            aes(y = , label = interactions, group =condition), color = "white")+
+  scale_fill_manual(values = c("#00539CFF", "orangered"))+
+  theme_classic() +  
+  xlab("Cell line") + ylab("Contact number") + 
+  ggtitle("Number of statistically significant interactions with POLR3G (BENGI dataset)") 
+p
+```
+
+
+
+
+
+```{r plot_pie_bengi, fig.width=8, fig.height=5}
+pie_df = data.frame("value" = c(length(unique), length(not_unique)),
+                    "condition" = c("unique","common"))
+
+
+ggplot(pie_df, aes(x="", y=value, fill=condition)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() + 
+  scale_fill_manual(values = c("#00539CFF", "orangered")) + 
+  geom_text(
+    position = position_stack(vjust = 0.5), 
+    size = 5, 
+    aes(y = ,label = value, group =condition), color = "white")+
+  ggtitle("Number of statistically significant interactions \n with POLR3G (BENGI dataset)") 
+
+
+```
+
+
+
+
+## Capturabilité / nb d'intéractions significative
+
+```{r plot, fig.width=8, fig.height=5}
+# Nb interactions / freq moyenne
+count_freq = lapply(interactions_05, function(x) x$freq)
+count_freq = lapply(count_freq, function(x) 
+  return(data.frame("mean_freq" = mean(x), "interaction_number" = length(x))))
+count_freq = ldply(count_freq)
+row.names(count_freq) = count_freq$.id
+count_freq$.id = NULL
+```
+
+```{r plot1, fig.width=8, fig.height=5}
+ggplot(count_freq, aes(x=mean_freq, y=interaction_number)) +
+  geom_point(color = "red") + 
+  ggrepel::geom_text_repel(aes(label = rownames(count_freq)),
+                 size = 3.5) +
+  theme_classic() +
+  xlab("Mean Frequency / Capturability") + ylab("Interaction number")
+
+```
+
+```{r test}
+# Non normal
+shapiro.test(count_freq$mean_freq)
+
+# non significatif
+cor.test(~mean_freq+interaction_number, count_freq, method = "spearman")
+
+```
+
+
+
+
+
+
+

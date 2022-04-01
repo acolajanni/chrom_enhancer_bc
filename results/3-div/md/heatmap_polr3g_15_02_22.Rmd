@@ -1,0 +1,338 @@
+---
+title: "heatmap_polr3g_15_02_22"
+author: "Antonin_Colajanni"
+date: "15/02/2022"
+output: html_document
+---
+
+# Fonctions, variables
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+# W O R K I N G  D I R E C T O R Y
+main.dir = "/shared/projects/chrom_enhancer_bc"
+setwd(main.dir)
+
+data.dir = file.path(main.dir,"data/interaction/rdata/")
+
+# I M P O R T
+source("./scripts/fun_interactions.r")
+
+load(file.path(data.dir,"/3div_0.05.Rdata"))
+load(file.path(data.dir,"/raw_BENGI_interactions_POLR3G.RData"))
+
+data = File_list_filtered0.05
+rm(File_list_filtered0.05)
+data_05 = lapply(data, hic_format )
+data_01 = lapply(data_05, function(x) filter_pvalue(df=x, seuil = 2))
+
+
+heatmap_range = GRanges(
+  seqnames = Rle("chr5"),
+  IRanges(89768410-2e+6, 89777404+2e+6)
+)
+
+# bins of 8kb
+binsize = 8000
+```
+
+
+
+```{r pressure }
+# bins of 8kb for heatmap visualisations center around polr3g bait
+borne_inf = seq(89768410-2e+6 , 89777404+2e+6, by = binsize)
+borne_sup = seq(89768410-2e+6+binsize-1 , 89777404+2e+6+binsize-1, by = binsize)
+
+# Subset to keep chr5 (faster computation)
+chr5 = lapply(data_05, function(x) subset_chr(x, "chr5"))
+
+# Creating the list of subsetted dataframe around the interval 
+range_4MB = lapply(chr5, function(x) subset_by_interval(x,89768410-2e+6, 89777404+2e+6) )
+
+# add empty interactions (diagonal) for heatmap visualisation
+diagonal = data.frame("frag1"=paste0(borne_inf,"-",borne_sup), 
+                      "frag2"=paste0(borne_inf,"-",borne_sup))
+
+# Adding "diagonal" values in each dataframe of the list
+range_4MB = lapply(range_4MB, function(x) rbind(dplyr::select(x,frag1,frag2), diagonal))
+
+
+# transform it into a single dataframe
+range_4MB = ldply(range_4MB)
+
+# bins into dataframe for easier steps
+bornes = data.frame("start"=borne_inf, "end"=borne_sup)
+
+# correspondence between bins and frag1 and 2 chromosomal positions
+include_in_bornes = get_position_inside_bins(range_4MB,bornes, 8000, "frag1")
+include_in_bornes2 = get_position_inside_bins(range_4MB,bornes, 8000, "frag2")
+
+
+# Merge all the bins interactions
+tmp = merge(dplyr::select(range_4MB,frag1,frag2),include_in_bornes, by.x = "frag1", by.y = ".id") 
+interactions = merge(tmp, include_in_bornes2, by.x = "frag2", by.y = ".id")
+
+
+# Middle position of the bin
+interactions = interactions %>% mutate(
+  frag1 = (start.x + end.x )/ 2,
+  frag2 = (start.y + end.y )/ 2
+) %>% dplyr::select(frag1, frag2)
+
+
+# Symetric matrix :
+interactions_reverse = filter(interactions, frag1 != frag2)
+interactions_reverse = interactions_reverse %>% mutate(
+  frag1_r = frag2,
+  frag2_r = frag1
+  ) %>% dplyr::select(frag1_r, frag2_r)
+
+colnames(interactions_reverse) = c("frag1","frag2")
+interactions = rbind(interactions, interactions_reverse)
+
+# To create square matrix
+mat = as.matrix(xtabs(~frag1+frag2,interactions))
+
+```
+
+# Heatmap d'interactions (p < 0.05)
+
+``` {r heatmap, fig.width=50, fig.height=50}
+pheatmap(log2(mat+1),
+         cluster_cols = FALSE, 
+         cluster_rows = FALSE,
+         show_rownames = TRUE, 
+         show_colnames = TRUE,
+         scale = "none",
+         #breaks = breaks,
+         #inferno(8, direction = -1)
+         brewer.pal(8, name = "YlOrRd"),
+         fontsize = 12,
+         main= "Contact heatmap center on POLR3G bait (87-91 Mbon chr5, p<0.05)")  
+
+```
+``` {r gviz, fig.height = 3, fig.width = 10}
+polr3g_exact = GRanges(
+  seqnames = Rle("chr5"),
+  IRanges(89768410, 89777404)
+)
+
+interaction_polr3g = 
+  lapply(data_05, function(x) subset_by_overlap(ROI = polr3g_exact, df = x))
+interaction_polr3g = ldply(interaction_polr3g)
+
+# Color scale 3div
+interactions = data.frame(table(interaction_polr3g$interaction_polr3g))
+colors = viridis(max(interactions$Freq), 
+                 direction = -1)[cut(interactions$Freq, max(interactions$Freq))] 
+
+inf = seq(88000000,91000000,by = (91000000-88000000)/15)
+sup = seq(88190000,91000000,by = (91000000-88000000)/15)
+bornes = paste0(inf[1:15],"-",sup[1:15])
+color_scale = GRanges(bornes, seqnames = Rle("chr5"))
+
+
+# color scale BENGI
+load(file.path(data.dir,"/raw_BENGI_interactions_POLR3G.RData"))
+raw_bengi_polr3g_df = ldply(raw_bengi_polr3g)
+polr3g_BENGI = data.frame(table(raw_bengi_polr3g_df$polr3g_interaction))
+
+bengi = GRanges(polr3g_BENGI$Var1, seqnames = Rle("chr5"))
+range_bengi = GRanges(
+  seqnames = Rle("chr"),
+  IRanges(polr3g_BENGI$Var1)
+)
+
+colors_bengi = viridis(max(polr3g_BENGI$Freq), 
+                 direction = -1)[cut(polr3g_BENGI$Freq,max(polr3g_BENGI$Freq))] 
+
+
+inf_2 = seq(88000000,91000000,by = (91000000-88000000)/max(polr3g_BENGI$Freq))
+sup_2 = seq(89450000,91000000,by = (91000000-88000000)/max(polr3g_BENGI$Freq))
+bornes_2 = paste0(inf[1:max(polr3g_BENGI$Freq)],"-",sup[1:max(polr3g_BENGI$Freq)])
+color_scale_2 = GRanges(bornes_2, seqnames = Rle("chr5"))
+
+
+
+
+
+
+
+ref = GRanges(
+  unique(interaction_polr3g$interaction_polr3g),
+  seqnames = Rle("chr5"))  
+
+atrack <- AnnotationTrack(ref, name = "3div", fill = colors, col = NULL)
+atrack_bengi = AnnotationTrack(bengi, name = "BENGI",col = NULL, fill = colors_bengi)
+atrack_scale = AnnotationTrack(color_scale, col = NULL, 
+                               fill =viridis(max(interactions$Freq), direction = -1),
+                               showFeatureId=TRUE, name = "colors_scale 3_div",
+                               id = c(1:max(interactions$Freq))) 
+
+atrack_scale_bengi = AnnotationTrack(color_scale_2, col = NULL, 
+                               fill =viridis(max(polr3g_BENGI$Freq), direction = -1),
+                               showFeatureId=TRUE, name = "colors_scale bengi",
+                               id = c(1:2)) 
+
+
+
+
+
+
+gtrack <- GenomeAxisTrack(IRanges(start = 89768410 - 2000000, end = 89777404 + 2000000))
+itrack <- IdeogramTrack(genome="hg19", 
+                        chromosome="chr5", 
+                        from =89768410 - 2000000,
+                        to=89777404 + 2000000)
+
+gtrack <- GenomeAxisTrack(IRanges(start = 89768410 - 2000000, end = 89777404 + 2000000))
+itrack <- IdeogramTrack(genome="hg19", 
+                        chromosome="chr5", 
+                        from =89768410 - 2000000,
+                        to=89777404 + 2000000)
+
+ht = HighlightTrack(trackList = 
+                      list(atrack_scale, itrack, gtrack,atrack, atrack_bengi,atrack_scale_bengi),
+                      start = 89768410, end = 89777404, name = "POLR3G_Bait")
+
+plotTracks(list(ht))
+
+```
+
+# Avec p<0.01
+
+
+
+```{r pressure2 }
+# Subset to keep chr5 (faster computation)
+chr5 = lapply(data_01, function(x) subset_chr(x, "chr5"))
+
+# Creating the list of subsetted dataframe around the interval 
+range_4MB = lapply(chr5, function(x) subset_by_interval(x,89768410-2e+6, 89777404+2e+6) )
+
+# add empty interactions (diagonal) for heatmap visualisation
+diagonal = data.frame("frag1"=paste0(borne_inf,"-",borne_sup), 
+                      "frag2"=paste0(borne_inf,"-",borne_sup))
+
+# Adding "diagonal" values in each dataframe of the list
+range_4MB = lapply(range_4MB, function(x) rbind(dplyr::select(x,frag1,frag2), diagonal))
+
+
+# transform it into a single dataframe
+range_4MB = ldply(range_4MB)
+
+# bins into dataframe for easier steps
+bornes = data.frame("start"=borne_inf, "end"=borne_sup)
+
+# correspondence between bins and frag1 and 2 chromosomal positions
+include_in_bornes = get_position_inside_bins(range_4MB,bornes, 8000, "frag1")
+include_in_bornes2 = get_position_inside_bins(range_4MB,bornes, 8000, "frag2")
+
+
+# Merge all the bins interactions
+tmp = merge(dplyr::select(range_4MB,frag1,frag2),include_in_bornes, by.x = "frag1", by.y = ".id") 
+interactions = merge(tmp, include_in_bornes2, by.x = "frag2", by.y = ".id")
+
+
+# Middle position of the bin
+interactions = interactions %>% mutate(
+  frag1 = (start.x + end.x )/ 2,
+  frag2 = (start.y + end.y )/ 2
+) %>% dplyr::select(frag1, frag2)
+
+
+# Symetric matrix :
+interactions_reverse = filter(interactions, frag1 != frag2)
+interactions_reverse = interactions_reverse %>% mutate(
+  frag1_r = frag2,
+  frag2_r = frag1
+  ) %>% dplyr::select(frag1_r, frag2_r)
+
+colnames(interactions_reverse) = c("frag1","frag2")
+interactions = rbind(interactions, interactions_reverse)
+
+# To create square matrix
+mat = as.matrix(xtabs(~frag1+frag2,interactions))
+
+```
+
+
+``` {r heatmap2, fig.width=50, fig.height=50}
+pheatmap(log2(mat+1),
+         cluster_cols = FALSE, 
+         cluster_rows = FALSE,
+         show_rownames = TRUE, 
+         show_colnames = TRUE,
+         scale = "none",
+         #breaks = breaks,
+         #inferno(8, direction = -1)
+         brewer.pal(8, name = "YlOrRd"),
+         fontsize = 12,
+         main= "Contact heatmap center on POLR3G bait (87-91 Mbon chr5, p<0.01)")  
+
+```
+
+
+``` {r gviz2, fig.height = 3, fig.width = 10}
+
+
+polr3g_exact = GRanges(
+  seqnames = Rle("chr5"),
+  IRanges(89768410, 89777404)
+)
+
+interaction_polr3g = 
+  lapply(data_01, function(x) subset_by_overlap(ROI = polr3g_exact, df = x))
+
+interaction_polr3g = ldply(interaction_polr3g)
+
+# colors scale
+interactions = data.frame(table(interaction_polr3g$interaction_polr3g))
+colors = viridis(max(interactions$Freq), 
+                 direction = -1)[cut(interactions$Freq,max(interactions$Freq))] 
+
+colors_bengi = viridis(max(polr3g_BENGI$Freq), 
+                 direction = -1)[cut(polr3g_BENGI$Freq,max(polr3g_BENGI$Freq))] 
+
+inf = seq(88000000,91000000,by = (91000000-88000000)/max(interactions$Freq))
+sup = seq(88290000,91000000,by = (91000000-88000000)/max(interactions$Freq))
+bornes = paste0(inf[1:max(interactions$Freq)],"-",sup[1:max(interactions$Freq)])
+color_scale = GRanges(bornes, seqnames = Rle("chr5"))
+
+inf_2 = seq(88000000,91000000,by = (91000000-88000000)/max(polr3g_BENGI$Freq))
+sup_2 = seq(89450000,91000000,by = (91000000-88000000)/max(polr3g_BENGI$Freq))
+bornes_2 = paste0(inf[1:max(polr3g_BENGI$Freq)],"-",sup[1:max(polr3g_BENGI$Freq)])
+color_scale_2 = GRanges(bornes_2, seqnames = Rle("chr5"))
+
+
+ref = GRanges(
+  unique(interaction_polr3g$interaction_polr3g),
+  seqnames = Rle("chr5"))  
+
+atrack <- AnnotationTrack(ref, name = "3div", fill = colors, col = NULL)
+atrack_bengi = AnnotationTrack(bengi, name = "BENGI",col = NULL, fill = colors_bengi)
+atrack_scale = AnnotationTrack(color_scale, col = NULL, 
+                               fill =viridis(max(interactions$Freq), direction = -1),
+                               showFeatureId=TRUE, name = "colors_scale 3_div",
+                               id = c(1:max(interactions$Freq))) 
+
+atrack_scale_bengi = AnnotationTrack(color_scale_2, col = NULL, 
+                               fill =viridis(max(polr3g_BENGI$Freq), direction = -1),
+                               showFeatureId=TRUE, name = "colors_scale bengi",
+                               id = c(1:2)) 
+
+
+gtrack <- GenomeAxisTrack(IRanges(start = 89768410 - 2000000, end = 89777404 + 2000000))
+itrack <- IdeogramTrack(genome="hg19", 
+                        chromosome="chr5", 
+                        from =89768410 - 2000000,
+                        to=89777404 + 2000000)
+
+ht = HighlightTrack(trackList = 
+                      list(atrack_scale, itrack, gtrack,atrack, atrack_bengi,atrack_scale_bengi),
+                      start = 89768410, end = 89777404, name = "POLR3G_Bait")
+
+plotTracks(list(ht))
+
+```
+
+
+

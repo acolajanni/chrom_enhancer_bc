@@ -1,0 +1,79 @@
+---
+title: "Interactions_totale_22_02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r import, echo=T, results='hide', message=F, warning=F}
+# W O R K I N G  D I R E C T O R Y
+main.dir = "/shared/projects/chrom_enhancer_bc"
+setwd(main.dir)
+
+data.dir = file.path(main.dir,"data/interaction/rdata/")
+
+
+# I M P O R T
+library(DT)
+source("./scripts/fun_interactions.r")
+load(file.path(data.dir,"/3div_0.05.Rdata"))
+load(file.path(data.dir,"/raw_BENGI_interactions_POLR3G.RData"))
+
+data = File_list_filtered0.05
+rm(File_list_filtered0.05)
+data_05 = lapply(data, hic_format )
+data_01 = lapply(data_05, function(x) filter_pvalue(df=x, seuil = 2))
+```
+
+# p < 0.05
+
+```{r data_05}
+polr3g_exact = GRanges(
+  seqnames = Rle("chr5"),
+  IRanges(89768410, 89777404))
+
+# interactions lists 
+interactions_05 = lapply(data_05, function(x) subset_by_overlap(ROI = polr3g_exact, df = x))
+interaction_polr3g_05 = lapply(interactions_05, function(x) x$interaction_polr3g)
+# as dataframe
+interactions_df_05 = ldply(interactions_05)
+
+freq = data.frame(table(interactions_df_05$interaction_polr3g))
+
+freq = arrange(freq, desc(Freq))
+DT::datatable(freq)
+```
+
+# p < 0.01
+
+```{r data_01}
+
+# interactions lists 
+interactions_01 = lapply(data_01, function(x) subset_by_overlap(ROI = polr3g_exact, df = x))
+interaction_polr3g_01 = lapply(interactions_01, function(x) x$interaction_polr3g)
+# as dataframe
+interactions_df_01 = ldply(interactions_01)
+
+freq_01 = data.frame(table(interactions_df_01$interaction_polr3g))
+
+freq_01 = arrange(freq_01, desc(Freq))
+
+DT::datatable(freq_01)
+
+```
+
+
+# BENGI
+
+```{r BENGI}
+interaction_bengi_df = ldply(raw_bengi_polr3g)
+freq_bengi = data.frame(table(interaction_bengi_df$polr3g_interaction))
+
+freq_bengi = arrange(freq_bengi, desc(Freq))
+
+DT::datatable(freq_bengi)
+
+```

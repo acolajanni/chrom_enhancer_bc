@@ -1,0 +1,190 @@
+---
+title: "Interaction_polr3g_05vs01 "
+author: "Antonin_Colajanni"
+date: "10/02/2022"
+output: html_document
+---
+
+```{r aaa, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Import / fonctions
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library (plyr)
+library(reshape2)
+library(stringr)
+library(ggplot2)
+library(InteractionSet)
+library(GenomicRanges)
+
+
+source("/shared/ifbstor1/home/acolajanni/scripts/fun_interactions.r")
+source("/shared/ifbstor1/home/acolajanni/scripts/functions_vizu.r")
+```
+
+## Récupérations des données
+```{r Import}
+####### Filtered at pvalue = 0.05
+load("/shared/ifbstor1/home/acolajanni/data/phic/rdata/3div_0.05.Rdata")
+
+
+
+```
+
+
+
+
+## Chercher les intéractions :
+### POLR3G chromosomic location : 
+[ENCODE](https://grch37.ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG00000113356;r=5:89767565-89810370)
+### Chromosome 5: 89767565-89810370
+
+```{r polr3g}
+#polr3g = GRanges(
+#  seqnames = Rle("chr 5"),
+#  ranges = IRanges(start = 89770680, end = 89777400)) 
+
+## Ne fonctionne pas comme il faut : trouver une solution
+#load("/shared/ifbstor1/home/acolajanni/data/phic/rdata/promoterBaitsHuman.RData")
+#polr3g = baitGR[baitGR$SYMBOL == "POLR3G"]
+
+polr3g = GRanges(
+  seqnames = Rle("chr 5"),
+  ranges = IRanges(start = 89758361, end = 89767753)) 
+
+```
+
+
+
+```{r polr3g_prep}
+####### Filtered at pvalue = 0.01
+filter_pvalue <-function(df,seuil = 2){
+  return(filter(df,X.log10.result. >= seuil))}
+
+data_0.05 = lapply(File_list_filtered0.05, hic_format )
+data_0.01 = lapply(data_0.05, function(x) filter_pvalue(df=x, seuil = 2))
+
+
+
+
+```
+
+
+## Filter at p<0.05
+
+```{r viz025}
+interactions_0.05 = lapply(data_0.05, function(x) subset_by_overlap(ROI = polr3g, df = x))
+df0.05 = lapply(interactions_0.05 ,count_row)
+df0.05 = list_to_2colDF(df0.05)
+
+
+ggplot(data=df0.05, aes(x=reorder(variable, -value), y=value)) +
+  geom_bar(stat="identity")+
+  ggtitle("Distribution of contact related to POLR3G (p < 0.05)") +
+  xlab("Cell line") + ylab("Contact number") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) 
+
+```
+```{r viz105}
+
+ggplot(data=df0.05, aes( x=value)) +
+  geom_histogram(bins = 15,color="black" )+
+  ggtitle("Histogram of contact related to POLR3G (p < 0.05)") +
+  xlab("") + ylab("frequence") + 
+  theme_minimal() 
+
+
+```
+
+
+## Filter at 0.01
+
+```{r viz001}
+interactions_0.01 = lapply(data_0.01, function(x) subset_by_overlap(ROI = polr3g, df = x))
+df0.01 = lapply(interactions_0.01 ,count_row)
+df0.01 = list_to_2colDF(df0.01)
+
+
+ggplot(data=df0.01, aes(x=reorder(variable, -value), y=value)) +
+  geom_bar(stat="identity")+
+  ggtitle("Distribution of contact related to POLR3G (p < 0.01)") +
+  xlab("Cell line") + ylab("Contact number") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) 
+
+```
+
+```{r viz000001}
+
+ggplot(data=df0.01, aes( x=value)) +
+  geom_histogram(bins = 12  |...............................................................       |  89%,color="black" )+
+  ggtitle("Histogram of contact related to POLR3G (p < 0.01)") +
+  xlab("") + ylab("frequence") + 
+  theme_minimal() 
+
+
+```
+
+## Comparaison entre filtrage des intéractions avec POLR3G
+
+```{r viz_tot}
+
+vizTot = list("Filter_0.05" = df0.05, "Filter_0.01" = df0.01)
+
+df_tot = list_to_2colDF(vizTot)
+
+df_tot = df_tot[-c(1,2)]
+df_tot$variable = str_remove(df_tot$variable, ".value")
+
+
+
+ggplot(df_tot, aes(x=variable, y=value)) + 
+  geom_boxplot(fill='#A4A4A4', color="black") +
+  ggtitle("Contact boxplot related to POLR3G depending on filters applied") +
+  xlab("") + ylab("Contact number") + 
+  theme_minimal()
+
+```
+
+
+```{r viztest1}
+ggplot(df_tot, aes(x=variable, y=value)) + 
+  geom_violin(fill='#A4A4A4', color="black") +
+  stat_summary(fun.data=mean_se, geom="pointrange", color="black") +
+  ggtitle("Contact violin plot related to POLR3G depending on filters applied") +
+  xlab("Cell line") + ylab("Contact number") + 
+  theme_minimal()
+
+```
+
+
+# Distribution :
+
+## Filter at 0.05
+
+```{r viztest5}
+
+ggplot(df0.05 , aes(y=value, x="Filter at p < 0.05")) + 
+  geom_violin(fill='#A4A4A4', color="black") +
+  stat_summary(fun.data=mean_se, geom="pointrange", color="black") +
+  ggtitle("Contact boxplot related to POLR3G (Filtered at p<0.05") +
+  xlab("") + ylab("Contact number") + 
+  theme_minimal()
+
+```
+
+## Filter at 0.01
+
+```{r viztest6}
+
+ggplot(df0.01 , aes(y=value, x="Filter at p < 0.001")) + 
+  geom_violin(fill='#A4A4A4', color="black") +
+  stat_summary(fun.data=mean_se, geom="pointrange", color="black") +
+  ggtitle("Contact boxplot related to POLR3G (Filter at p<0.001") +
+  xlab("") + ylab("Contact number") + 
+  theme_minimal()
+
+```

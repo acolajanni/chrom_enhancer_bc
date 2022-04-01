@@ -1,0 +1,290 @@
+---
+title: "Contact_number per chromosomes"
+author: "Antonin_Colajanni"
+date: "08/02/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Contact number per chromosome :
+```{r chrom}
+library(dplyr)
+library (plyr)
+library(reshape2)
+library(stringr)
+library(ggplot2)
+
+
+
+#' Change the format of the original 3div dataframes to something readable for 
+#' Hi-C analysis
+#'
+#' @param df dataframe
+#'
+#' @return
+#' @examples
+#' 
+hic_format <- function(df){
+  hic = df %>% 
+    mutate(seq1 = 
+      paste0("chr", formatC(str_remove(substring(frag1, 4 , 5), ":"), width=2, flag="0"))
+      ) %>% 
+    mutate(seq2 = 
+      paste0("chr", formatC(str_remove(substring(frag2, 4 , 5), ":"), width=2, flag="0"))
+      ) %>% 
+    mutate(
+      frag1 = str_remove(frag1, pattern = "chr(..?):"),
+      frag2 = str_remove(frag2, pattern = "chr(..?):")
+    ) 
+  return(hic)
+}
+
+
+#' Count the number of contact for each chromosome (in column "seq")
+#'
+#' @param df dataframe
+#'
+#' @return list of dataframe with 2 column (chromosome, count value)
+count_chrom = function(df){
+  return(data.frame(table(df$seq1)))}
+
+``` 
+
+
+
+# Load data
+```{r Import}
+####### Filtered at pvalue = 0.05
+load("/shared/ifbstor1/home/acolajanni/data/phic/rdata/3div_0.05.Rdata")
+
+####### Filtered at pvalue = 0.001
+load("/shared/ifbstor1/home/acolajanni/data/phic/rdata/3div_0.001.Rdata")
+
+####### not Filtered
+load("/shared/ifbstor1/home/acolajanni/data/phic/rdata/3div_po_txt.Rdata")
+
+```
+
+```{r prep}
+filter_pvalue <-function(df,seuil = 2){
+  return(filter(df,X.log10.result. >= seuil))}
+
+
+data_tot = lapply(File_list, hic_format )
+data_tot = lapply(data_tot, count_chrom)
+data_tot <- ldply (data_tot, data.frame)
+colnames(data_tot) = c("cell_line","chr","contact")
+
+
+data_0.001 = lapply(File_list_filtered0.001, hic_format )
+data_0.001 = lapply(data_0.001, count_chrom)
+data_0.001 <- ldply (data_0.001, data.frame)
+colnames(data_0.001) = c("cell_line","chr","contact")
+
+
+data_0.05 = lapply(File_list_filtered0.05, hic_format )
+
+data_0.01 = lapply(data_0.05, function(x) filter_pvalue(x, seuil = 2))
+
+data_0.05 = lapply(data_0.05, count_chrom)
+data_0.05 <- ldply (data_0.05, data.frame)
+colnames(data_0.05) = c("cell_line","chr","contact")
+
+
+data_0.01 = lapply(data_0.01, count_chrom)
+data_0.01 <- ldply (data_0.01, data.frame)
+colnames(data_0.01) = c("cell_line","chr","contact")
+
+
+# Different cell_line
+cells = unique(data_tot$cell_line)
+```
+
+# Visualisation : 
+## No filter
+
+```{r viz1}
+
+
+df1 = data_tot[data_tot$cell_line %in% cells[1:8], ]
+df2 = data_tot[data_tot$cell_line %in% cells[9:17],]
+df3 = data_tot[data_tot$cell_line %in% cells[18:28],]
+
+ggplot(df1, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+
+```
+
+```{r viz12}
+ggplot(df2, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+```{r viz13}
+
+ggplot(df3, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+## filtered at p < 0.05
+```{r viz2}
+
+
+df1 = data_0.05[data_0.05$cell_line %in% cells[1:8], ]
+df2 = data_0.05[data_0.05$cell_line %in% cells[9:17],]
+df3 = data_0.05[data_0.05$cell_line %in% cells[18:28],]
+
+ggplot(df1, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+
+```
+
+```{r viz22}
+ggplot(df2, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+```{r viz23}
+
+ggplot(df3, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+## filtered at p < 0.001
+```{r viz3}
+
+
+df1 = data_0.001[data_0.001$cell_line %in% cells[1:8], ]
+df2 = data_0.001[data_0.001$cell_line %in% cells[9:17],]
+df3 = data_0.001[data_0.001$cell_line %in% cells[18:28],]
+
+ggplot(df1, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+
+```
+
+```{r viz32}
+ggplot(df2, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+```{r viz33}
+
+ggplot(df3, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+## Filtre à 0.01
+
+
+```{r viz4}
+
+
+df1 = data_0.01[data_0.01$cell_line %in% cells[1:8], ]
+df2 = data_0.01[data_0.01$cell_line %in% cells[9:17],]
+df3 = data_0.01[data_0.01$cell_line %in% cells[18:28],]
+
+ggplot(df1, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+
+```
+
+```{r viz42}
+ggplot(df2, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+```{r viz43}
+
+ggplot(df3, aes(x=chr, y=contact)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~ cell_line, nrow = 3 ) +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Compte entre chromosomes :
+## No filter
+```{r inter chr}
+
+count_inter_chr <- function(df){
+  return( nrow(df[df$seq1 != df$seq2 ,]) )
+}
+
+data = lapply(File_list, hic_format )
+lapply(data, count_inter_chr)
+
+```
+
+## Filtered at p > 0.05
+```{r inter chr005}
+
+
+data = lapply(File_list_filtered0.05, hic_format )
+lapply(data, count_inter_chr)
+
+```
+
+## Filtered at p > 0.001
+```{r inter chr0001}
+
+
+data = lapply(File_list_filtered0.001, hic_format )
+lapply(data, count_inter_chr)
+
+```
