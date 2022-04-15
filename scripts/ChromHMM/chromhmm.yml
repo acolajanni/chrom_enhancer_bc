@@ -1,0 +1,7 @@
+name: env_chromhmm
+channels:
+- bioconda
+- conda-forge
+- defaults
+dependencies:
+- bioconda::chromhmm=1.14 

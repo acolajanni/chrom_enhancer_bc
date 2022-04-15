@@ -347,3 +347,26 @@ write.table(paths, file = "./data/interaction/GROseq/BigWig_paths.txt", quote = 
 write.table(data.frame(files_K562,filenames_K562), file = "./data/interaction/GROseq/bedgraph_paths.txt", quote = FALSE, sep = " ",
             row.names = FALSE, col.names = FALSE)
 
+
+
+
+################
+# Save bedgraph location
+
+# W O R K I N G  D I R E C T O R Y
+main.dir = "/shared/projects/chrom_enhancer_bc"
+setwd(main.dir)
+
+# I M P O R T
+source("./scripts/fun_interactions.r")
+data.dir = file.path(main.dir,"data/interaction/ATAC")
+bedgraph.dir = file.path(main.dir,"data/interaction/bedgraph_analysis/bed_file" )
+
+bedgraph_files_full = list.files(bedgraph.dir, full.names = TRUE) 
+bedgraph_files = list.files(bedgraph.dir, full.names = FALSE) 
+bedgraph_names = str_remove_all(bedgraph_files, ".bigwig.bedgraph|.bedgraph")
+
+df=data.frame(bedgraph_files_full, bedgraph_names)
+
+
+write.table(df, file = "./data/interaction/bedgraph_analysis/bedGraph_location.txt",quote = F, row.names = F, col.names = F )
